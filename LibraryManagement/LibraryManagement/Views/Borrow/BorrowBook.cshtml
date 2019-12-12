@@ -1,0 +1,72 @@
+﻿@using Vereyon.Web
+@model LibraryManagement.Models.Borrow
+
+@{
+    ViewBag.Title = "BorrowBook";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>Borrow Book</h2>
+
+
+@using (Html.BeginForm())
+{
+
+    @Html.RenderFlashMessages()
+    <div class="form-group">
+        @Html.LabelFor(m => m.Member.MemberNo)
+        @Html.TextBoxFor(m => m.Member.MemberNo, new { @class = "form-control" })
+        @Html.ValidationMessageFor(m => m.Member.MemberNo, "", new { @class = "text-danger" })
+
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(m => m.Book.Title, "Book Name")
+        @Html.DropDownList("Books", null, "--select--", htmlAttributes: new { @class = "form-control" })
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(m => m.Book.Author)
+        @Html.TextBoxFor(m => m.Book.Author, new { @class = "form-control", @readonly = "readonly" })
+        @Html.ValidationMessageFor(m => m.Book.Author, "", new { @class = "text-danger"})
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(m => m.Book.Publisher)
+        @Html.TextBoxFor(m => m.Book.Publisher, new { @class = "form-control", @readonly = "readonly" })
+        @Html.ValidationMessageFor(m => m.Book.Publisher, "", new { @class = "text-danger" })
+    </div>
+
+    <input type="submit" value="Borrow" class="btn btn-default" />
+
+}
+
+@section scripts
+{
+
+    <script src="~/Scripts/jquery-3.3.1.min.js"></script>
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            $("#Books").change(function () {
+                var id = $("#Books").val();
+                var parameter = { bookId: id }
+                
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("GetBookById", "Borrow")',
+                    contentType: "application/json;charset=utf-8",
+                    data: JSON.stringify(parameter),
+                    success: function (borrow) {
+                        $("#Book_Author").val(borrow.Author);
+                        $("#Book_Publisher").val(borrow.Publisher);
+                    }
+                });
+
+            });
+        });
+    </script>
+
+}

@@ -1,0 +1,534 @@
+
+-------------------------------------------------------------------
+				INDEX
+-------------------------------------------------------------------
+Entity Command
+Department Model
+Student Model
+DepartmentController
+StudentController
+SaveDepartment View
+ViewDetails Department
+Ajax
+connectionStrings
+
+-------------------------------------------------------------------
+-------------------------------------------------------------------
+
+------------------------------------------------
+Entity Command
+------------------------------------------------
+
+PM> enable-migrations
+PM> add-migration
+Name: migrationName
+PM> update-database
+PM> update-database -targetmigration migrationName
+_______________________________________________________________________________________________________________
+
+
+------------------------------------------------
+Department Model
+------------------------------------------------
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Web.Mvc;
+
+namespace CodeFirstDataAnotation.Models
+{
+    public class Department
+    {
+        [Key]
+        public int DepartmentId { get; set; }
+
+        [Required(ErrorMessage = "Please enter department code")]
+        [StringLength(7,MinimumLength = 2,ErrorMessage = "Code must be 2-7 character long")]
+        [Column(TypeName = "varchar")]
+        [Display(Name = "Department Code")]
+        [Remote("IsDeptCodeExists","Department",ErrorMessage = "Department Already exists")]
+        public string DepartmentCode { get; set; }
+
+        [Required(ErrorMessage = "Please enter department Name")]
+        [Column(TypeName = "varchar")]
+        [StringLength(50)]
+        [Display(Name = "Department Name")]
+        public string DepartmentName { get; set; }
+    }
+}
+_______________________________________________________________________________________________________________
+
+------------------------------------------------
+Student Model
+------------------------------------------------
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace CodeFirstDataAnotation.Models
+{
+    public class Student
+    {
+        [Key]
+        public int StudentId { get; set; }
+        [Required(ErrorMessage = "please enter name")]
+        public string StudentName { get; set; }
+
+        [DataType(DataType.MultilineText)]
+        public string Address { get; set; }
+
+		[Required(ErrorMessage = "Please enter email")]
+        [EmailAddress]
+        [RegularExpression("^[a-zA-Z0-9_\\.-]+@([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,6}$", ErrorMessage = "Invalid Email")]
+        public string Email { set; get; }
+
+
+        [Required(ErrorMessage = "Please enter age")]
+        [Range(18, 99, ErrorMessage = "Age must be between 18-99")]
+        public int Age { get; set; }
+
+        
+        public int DepartmentId { get; set; }
+        [ForeignKey("DepartmentId")]
+        public virtual Department Department { get; set; }
+    }
+}
+_______________________________________________________________________________________________________________
+
+------------------------------------------------
+
+------------------------------------------------
+
+
+_______________________________________________________________________________________________________________
+
+
+------------------------------------------------
+DepartmentController
+------------------------------------------------
+
+using System.Linq;
+using System.Web.Mvc;
+using CodeFirstDataAnotation.Models;
+using Vereyon.Web;
+
+namespace CodeFirstDataAnotation.Controllers
+{
+    public class DepartmentController : Controller
+    {
+        private ProjectDbContext db = new ProjectDbContext();
+        public ActionResult SaveDepartment()
+        {
+            return View();
+        }
+
+
+        [HttpPost]
+        public ActionResult SaveDepartment(Department department)
+        {
+            if (ModelState.IsValid)
+            {
+                db.Departments.Add(department);
+                db.SaveChanges();
+                FlashMessage.Confirmation("Department saved successfully");
+                return RedirectToAction("SaveDepartment");
+
+            }
+            return View();
+        }
+
+        public JsonResult IsDeptCodeExists(string departmentCode)
+        {
+            var dept = db.Departments.ToList();
+            if (!dept.Any(x=>x.DepartmentCode.ToLower()== departmentCode.ToLower()))
+            {
+                return Json(true, JsonRequestBehavior.AllowGet);
+            }
+
+            return Json(false, JsonRequestBehavior.AllowGet);
+        }
+
+        public ActionResult ViewDetails()
+        {
+            ViewBag.DepartmentIds = new SelectList(db.Departments, "DepartmentId", "DepartmentCode");
+            return View();
+        }
+
+        public JsonResult GetStudentByDeptId(int departmentId)
+        {
+            var students = db.Students.Where(x => x.DepartmentId == departmentId).ToList();
+            return Json(students);
+        }
+
+        public JsonResult GetStudentById(int id)
+        {
+            var student = db.Students.FirstOrDefault(x => x.StudentId == id);
+            return Json(student);
+        }
+    }
+}
+_______________________________________________________________________________________________________________
+
+------------------------------------------------
+StudentController
+------------------------------------------------
+
+using System.Data.Entity;
+using System.Linq;
+using System.Net;
+using System.Web.Mvc;
+using CodeFirstDataAnotation.Models;
+
+namespace CodeFirstDataAnotation.Controllers
+{
+    public class StudentsController : Controller
+    {
+        private ProjectDbContext db = new ProjectDbContext();
+
+        // GET: Students
+        public ActionResult Index()
+        {
+            var students = db.Students.Include(s => s.Department);
+            return View(students.ToList());
+        }
+
+        // GET: Students/Details/5
+        public ActionResult Details(int? id)
+        {
+            if (id == null)
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
+            Student student = db.Students.Find(id);
+            if (student == null)
+            {
+                return HttpNotFound();
+            }
+            return View(student);
+        }
+
+        // GET: Students/Create
+        public ActionResult Create()
+        {
+            ViewBag.DepartmentId = new SelectList(db.Departments, "DepartmentId", "DepartmentCode");
+            return View();
+        }
+
+        // POST: Students/Create
+        // To protect from overposting attacks, please enable the specific properties you want to bind to, for 
+        // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult Create([Bind(Include = "StudentId,StudentName,Address,Email,Age,DepartmentId")] Student student)
+        {
+            if (ModelState.IsValid)
+            {
+                db.Students.Add(student);
+                db.SaveChanges();
+                return RedirectToAction("Index");
+            }
+
+            ViewBag.DepartmentId = new SelectList(db.Departments, "DepartmentId", "DepartmentCode", student.DepartmentId);
+            return View(student);
+        }
+
+        // GET: Students/Edit/5
+        public ActionResult Edit(int? id)
+        {
+            if (id == null)
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
+            Student student = db.Students.Find(id);
+            if (student == null)
+            {
+                return HttpNotFound();
+            }
+            ViewBag.DepartmentId = new SelectList(db.Departments, "DepartmentId", "DepartmentCode", student.DepartmentId);
+            return View(student);
+        }
+
+        // POST: Students/Edit/5
+        // To protect from overposting attacks, please enable the specific properties you want to bind to, for 
+        // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult Edit([Bind(Include = "StudentId,StudentName,Address,Email,Age,DepartmentId")] Student student)
+        {
+            if (ModelState.IsValid)
+            {
+                db.Entry(student).State = EntityState.Modified;
+                db.SaveChanges();
+                return RedirectToAction("Index");
+            }
+            ViewBag.DepartmentId = new SelectList(db.Departments, "DepartmentId", "DepartmentCode", student.DepartmentId);
+            return View(student);
+        }
+
+        // GET: Students/Delete/5
+        public ActionResult Delete(int? id)
+        {
+            if (id == null)
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
+            Student student = db.Students.Find(id);
+            if (student == null)
+            {
+                return HttpNotFound();
+            }
+            return View(student);
+        }
+
+        // POST: Students/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public ActionResult DeleteConfirmed(int id)
+        {
+            Student student = db.Students.Find(id);
+            db.Students.Remove(student);
+            db.SaveChanges();
+            return RedirectToAction("Index");
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                db.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+    }
+}
+
+_______________________________________________________________________________________________________________
+
+
+------------------------------------------------
+SaveDepartment View
+------------------------------------------------
+
+@using Vereyon.Web
+@model CodeFirstDataAnotation.Models.Department
+
+@{
+    ViewBag.Title = "SaveDepartment";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>Save Department</h2>
+
+@using (Html.BeginForm())
+{
+
+    @Html.RenderFlashMessages()
+    <div class="form-group">
+        @Html.LabelFor(m => m.DepartmentCode)
+        @Html.TextBoxFor(m => m.DepartmentCode, new { @class = "form-control" })
+        @Html.ValidationMessageFor(m => m.DepartmentCode, "", new { @class = "text-danger" })
+
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(m => m.DepartmentName)
+        @Html.TextBoxFor(m => m.DepartmentName, new { @class = "form-control" })
+        @Html.ValidationMessageFor(m => m.DepartmentName, "", new { @class = "text-danger" })
+    </div>
+
+    <input type="submit" value="Create" class="btn btn-default" />
+
+}
+@section scripts
+{
+
+    <script src="~/Scripts/jquery-3.3.1.min.js"></script>
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+}
+
+_______________________________________________________________________________________________________________
+
+------------------------------------------------
+ViewDetails Department
+------------------------------------------------
+
+@model CodeFirstDataAnotation.Models.Department
+
+@{
+    ViewBag.Title = "ViewDetails";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>View Details</h2>
+
+@using (Html.BeginForm())
+{
+    <div class="form-group">
+        @Html.LabelFor(model => model.DepartmentId, "Department Code")
+        @Html.DropDownList("DepartmentIds", null, "--select--", htmlAttributes: new { @class = "form-control" })
+    </div>
+    <div class="form-group">
+        @Html.Label("Student Name")
+        <select class="form-control" id="studentId">
+            <option value="">--select student--</option>
+        </select>
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(model => model.DepartmentName)
+        @Html.TextBoxFor(m => m.DepartmentName, new { @class = "form-control",@readonly="readonly" })
+    </div>
+
+
+}
+
+<table class="table table-bordered table-striped">
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Address</th>
+        <th>Age</th>
+        <th>Department Name</th>
+    </tr>
+    </thead>
+    <tbody id="studentInfo">
+
+    </tbody>
+
+</table>
+
+@section scripts
+{
+    <script>
+        $(document).ready(function() {
+            $("#DepartmentIds").change(function () {
+                $("#studentId").empty();
+                $("#DepartmentName").val('');
+                $("#studentInfo").empty();
+                $("#studentId").append('<option value="">--select student--</option>');
+                var deptId = $("#DepartmentIds").val();
+                var parameter = { departmentId: deptId }
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("GetStudentByDeptId","Department")',
+                    //url:'/Department/GetStudentByDeptId'
+                    contentType: "application/json;charset=utf-8",
+                    data: JSON.stringify(parameter),
+                    success: function(studentList) {
+                        $.each(studentList, function (key, value) {
+                          
+                            $("#studentId").append('<option value='+value.StudentId+'>'+value.StudentName+'</option>');
+
+                        });
+
+
+                    }
+
+
+                });
+
+            });
+
+            $("#studentId").change(function () {               
+                var id = $("#studentId").val();
+                var parameter = { id: id }
+                $("#DepartmentName").val('');
+                $("#studentInfo").empty();
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("GetStudentById", "Department")',                    
+                    contentType: "application/json;charset=utf-8",
+                    data: JSON.stringify(parameter),
+                    success: function(student) {
+                        $("#DepartmentName").val(student.Department.DepartmentName);
+                        $("#studentInfo").append('<tr>' +
+                            '<td>' + student.StudentName + '</td>' +
+                            '<td>' + student.Email + '</td>' +
+                            '<td>' + student.Address + '</td>' +
+                            '<td>' + student.Age + '</td>' +
+                            '<td>' + student.Department.DepartmentName + '</td>' +
+                            '</tr>'                            
+                            );
+                    }
+                });
+
+            });
+        });
+    </script>
+   
+}
+
+_______________________________________________________________________________________________________________
+
+
+
+------------------------------------------------
+Ajax
+------------------------------------------------
+
+@section scripts
+{
+    <script>
+        $(document).ready(function() {
+            $("#DepartmentIds").change(function () {
+                $("#studentId").empty();
+                $("#DepartmentName").val('');
+                $("#studentInfo").empty();
+                $("#studentId").append('<option value="">--select student--</option>');
+                var deptId = $("#DepartmentIds").val();
+                var parameter = { departmentId: deptId }
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("GetStudentByDeptId","Department")',
+                    //url:'/Department/GetStudentByDeptId'
+                    contentType: "application/json;charset=utf-8",
+                    data: JSON.stringify(parameter),
+                    success: function(studentList) {
+                        $.each(studentList, function (key, value) {
+                          
+                            $("#studentId").append('<option value='+value.StudentId+'>'+value.StudentName+'</option>');
+
+                        });
+
+
+                    }
+
+
+                });
+
+            });
+
+            $("#studentId").change(function () {               
+                var id = $("#studentId").val();
+                var parameter = { id: id }
+                $("#DepartmentName").val('');
+                $("#studentInfo").empty();
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("GetStudentById", "Department")',                    
+                    contentType: "application/json;charset=utf-8",
+                    data: JSON.stringify(parameter),
+                    success: function(student) {
+                        $("#DepartmentName").val(student.Department.DepartmentName);
+                        $("#studentInfo").append('<tr>' +
+                            '<td>' + student.StudentName + '</td>' +
+                            '<td>' + student.Email + '</td>' +
+                            '<td>' + student.Address + '</td>' +
+                            '<td>' + student.Age + '</td>' +
+                            '<td>' + student.Department.DepartmentName + '</td>' +
+                            '</tr>'                            
+                            );
+                    }
+                });
+
+            });
+        });
+    </script>
+   
+}
+_______________________________________________________________________________________________________________
+
+<connectionStrings>   
+    <add name="ProjectDbContext" connectionString="Data Source=BITM-TRAINER-30\SQLEXPRESS;Initial Catalog=UniversityCodeFirst;Integrated Security=SSPI;" providerName="System.Data.SqlClient" />
+  </connectionStrings>
